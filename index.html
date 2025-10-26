@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>my launcher — pwa</title>
+
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0b1220">
+
+<style>
+  :root{
+    --bg:#0b1220;
+    --panel: rgba(255,255,255,0.06);
+    --accent:#22c1ff;
+    --icon-size:72px;
+    --grid-gap:14px;
+  }
+  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;color:#fff;background:#000;}
+  .phone {
+    width:390px;
+    height:844px;
+    margin:20px auto;
+    border-radius:34px;
+    overflow:hidden;
+    box-shadow:0 30px 60px rgba(0,0,0,0.6),0 6px 14px rgba(0,0,0,0.6);
+    background:var(--bg);
+    position:relative;
+    -webkit-user-select:none;
+    user-select:none;
+  }
+
+  /* wallpaper layer */
+  .wallpaper {
+    position:absolute;inset:0;background-size:cover;background-position:center;filter:brightness(.95);
+  }
+
+  /* status bar */
+  .status {
+    height:44px;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(6px);
+    background:linear-gradient(180deg, rgba(255,255,255,0.03), transparent);
+  }
+  .status .left{display:flex;gap:8px;align-items:center}
+  .status .time{font-weight:600;font-size:15px}
+
+  /* dock + app grid */
+  .content{position:relative;padding:14px 18px 88px;height:calc(100% - 44px);box-sizing:border-box}
+  .app-grid{
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap:var(--grid-gap);
+    margin-top:6px;
+    user-select:none;
+  }
+
+  .icon {
+    height:calc(var(--icon-size) + 24px);
+    display:flex;
+    align-items:center;
+    flex-direction:column;
+    gap:6px;
+    text-align:center;
+    cursor:pointer;
+    transition:transform .12s;
+  }
+  .icon .bubble{
+    width:var(--icon-size);
+    height:var(--icon-size);
+    border-radius:18px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:28px;font-weight:700;color:#fff;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.45);
+    opacity:.95;
+  }
+  .icon .label{font-size:12px;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+  .icon.dragging{opacity:.6;transform:scale(.98)}
+
+  .dock {
+    position:absolute;left:50%;transform:translateX(-50%);
+    bottom:18px;padding:10px 18px;border-radius:20px;background:rgba(255,255,255,0.06);
+    display:flex;gap:18px;align-items:center;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.6);
+  }
+
+  .controls {
+    position:absolute;right:12px;top:12px;display:flex;gap:8px;flex-direction:column;
+  }
+  .controls button{
+    border:0;padding:8px 10px;background:rgba(255,255,255,0.06);color:#fff;border-radius:10px;font-weight:600;backdrop-filter:blur(6px);
+  }
+
+  .panel {
+    position:absolute;left:12px;top:60px;padding:12px;border-radius:12px;background:var(--panel);backdrop-filter:blur(8px);
+  }
+
+  .modal {
+    position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;
+  }
+  .card{background:#0f1720;padding:16px;border-radius:12px;min-width:300px}
+  label{display:block;font-size:13px;margin-top:8px;color:#bcd}
+  input[type="text"], input[type="file"], textarea{width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:#07101a;color:#fff}
+  .row{display:flex;gap:8px;margin-top:10px}
+  .small{font-size:12px;padding:6px 8px}
+  .hint{font-size:12px;color:#9aa;font-style:italic;margin-top:6px}
+
+  @media (max-width:420px){
+    .phone{width:360px;height:780px}
+  }
+</style>
+</head>
+<body>
+<div class="phone" id="phone">
+  <div class="wallpaper" id="wallpaper"></div>
+
+  <div class="status">
+    <div class="left"><div class="time" id="time">12:00</div></div>
+    <div class="right"><div style="font-size:12px;opacity:.9">wifi • 100%</div></div>
+  </div>
+
+  <div class="content">
+    <div class="panel">
+      <strong>launcher</strong>
+      <div class="hint">drag to reorder • changes auto-save</div>
+    </div>
+
+    <div class="app-grid" id="grid"></div>
+
+    <div class="dock" id="dock">
+      <div class="icon" data-id="dock1"><div class="bubble" style="border-radius:14px;background:linear-gradient(135deg,#fff3 0,#fff5 100%);color:#222">★</div><div class="label">fav</div></div>
+      <div class="icon" data-id="dock2"><div class="bubble" style="border-radius:14px;background:linear-gradient(135deg,#fff3 0,#fff5 100%);color:#222">☎</div><div class="label">call</div></div>
+    </div>
+
+    <div class="controls">
+      <button id="addBtn">add icon</button>
+      <button id="wallBtn">set wallpaper</button>
+      <button id="exportBtn">export layout</button>
+      <button id="importBtn">import layout</button>
+      <button id="clearBtn">reset</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- hidden file input for wallpaper -->
+<input id="wallInput" type="file" accept="image/*" style="display:none" />
+
+<!-- modals -->
+<div id="modalRoot" style="display:none"></div>
+
+<script>
+/* ---------- simple utilities for base64-coded "share string" ---------- */
+function encodeShare(obj){
+  const json = JSON.stringify(obj);
+  // safely to btoa: encodeURIComponent -> binary string -> btoa
+  const uri = encodeURIComponent(json);
+  let binary = '';
+  for (let i=0;i<uri.length;i++){
+    binary += String.fromCharCode(uri.charCodeAt(i));
+  }
+  return btoa(binary);
+}
+function decodeShare(str){
+  try{
+    let binary = atob(str);
+    let uri = '';
+    for (let i=0;i<binary.length;i++){
+      uri += String.fromCharCode(binary.charCodeAt(i));
+    }
+    const json = decodeURIComponent(uri);
+    return JSON.parse(json);
+  }catch(e){
+    return null;
+  }
+}
+
+/* ---------- app data model ---------- */
+const DEFAULT_ICONS = [
+  {id:'1',label:'browser',emoji:'🌐',color:'#ff6b6b'},
+  {id:'2',label:'music',emoji:'🎧',color:'#f59e0b'},
+  {id:'3',label:'photos',emoji:'🖼️',color:'#60a5fa'},
+  {id:'4',label:'notes',emoji:'📝',color:'#a78bfa'},
+  {id:'5',label:'store',emoji:'🛒',color:'#34d399'},
+  {id:'6',label:'maps',emoji:'🗺️',color:'#fb7185'},
+  {id:'7',label:'game',emoji:'🎮',color:'#f97316'},
+  {id:'8',label:'settings',emoji:'⚙️',color:'#94a3b8'}
+];
+
+const STORAGE_KEY = 'launcher.data.v1';
+
+let state = {
+  icons: [...DEFAULT_ICONS],
+  wallpaper: '', // data url
+  timestamp: Date.now()
+};
+
+/* ---------- load & save ---------- */
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      Object.assign(state, parsed);
+    }
+  }catch(e){ console.warn(e) }
+}
+function saveState(){
+  state.timestamp = Date.now();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+/* ---------- render ---------- */
+const gridEl = document.getElementById('grid');
+const wallpaperEl = document.getElementById('wallpaper');
+function render(){
+  // wallpaper
+  if(state.wallpaper) wallpaperEl.style.backgroundImage = `url(${state.wallpaper})`;
+  else wallpaperEl.style.background = 'linear-gradient(180deg,#081428 0%,#041220 100%)';
+
+  // grid
+  gridEl.innerHTML = '';
+  state.icons.forEach((ic, idx) => {
+    const el = document.createElement('div');
+    el.className = 'icon';
+    el.dataset.id = ic.id;
+    el.innerHTML = `<div class="bubble" style="background:${ic.color}">${ic.emoji||ic.label[0]||'✱'}</div><div class="label">${ic.label}</div>`;
+    // context menu / edit
+    el.addEventListener('contextmenu', (ev)=>{ev.preventDefault(); openEditModal(ic);});
+    // click opens edit too
+    el.addEventListener('dblclick', ()=>openEditModal(ic));
+    // drag
+    el.draggable = true;
+    el.addEventListener('dragstart', (e)=>{
+      e.dataTransfer.setData('text/plain', ic.id);
+      el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', ()=>el.classList.remove('dragging'));
+    el.addEventListener('dragover', (e)=>e.preventDefault());
+    el.addEventListener('drop', (e)=>{
+      e.preventDefault();
+      const draggedId = e.dataTransfer.getData('text/plain');
+      reorderIcons(draggedId, ic.id);
+    });
+    gridEl.appendChild(el);
+  });
+}
+
+/* ---------- reorder helper ---------- */
+function reorderIcons(draggedId, targetId){
+  const ids = state.icons.map(i=>i.id);
+  const from = ids.indexOf(draggedId);
+  const to = ids.indexOf(targetId);
+  if(from<0||to<0||from===to) return;
+  const arr = [...state.icons];
+  const [item] = arr.splice(from,1);
+  arr.splice(to,0,item);
+  state.icons = arr;
+  saveState();
+  render();
+}
+
+/* ---------- UI actions ---------- */
+document.getElementById('addBtn').addEventListener('click', ()=>openCreateModal());
+document.getElementById('wallBtn').addEventListener('click', ()=>document.getElementById('wallInput').click());
+document.getElementById('wallInput').addEventListener('change', async (ev)=>{
+  const f = ev.target.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = function(){
+    state.wallpaper = reader.result;
+    saveState();
+    render();
+  };
+  reader.readAsDataURL(f);
+});
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const share = encodeShare({icons:state.icons, wallpaper: state.wallpaper});
+  prompt('copy this layout string (share it or save it somewhere):', share);
+});
+document.getElementById('importBtn').addEventListener('click', ()=>openImportModal());
+document.getElementById('clearBtn').addEventListener('click', ()=>{
+  if(confirm('reset launcher to defaults?')){ state = {icons:[...DEFAULT_ICONS], wallpaper:'', timestamp:Date.now()}; saveState(); render(); }
+});
+
+/* ---------- modals ---------- */
+const modalRoot = document.getElementById('modalRoot');
+function showModal(html){
+  modalRoot.innerHTML = `<div class="modal">${html}</div>`;
+  modalRoot.style.display = 'block';
+}
+function closeModal(){ modalRoot.style.display = 'none'; modalRoot.innerHTML=''; }
+
+function openCreateModal(){
+  const html = `<div class="card">
+    <h3>add icon</h3>
+    <label>label <input id="mi_label" type="text" placeholder="app name" /></label>
+    <label>emoji or char <input id="mi_emoji" type="text" placeholder="emoji or letter" /></label>
+    <label>color (css) <input id="mi_color" type="text" placeholder="#ff6b6b" /></label>
+    <div class="row"><button id="mi_add" class="small">add</button><button id="mi_cancel" class="small">cancel</button></div>
+  </div>`;
+  showModal(html);
+  document.getElementById('mi_cancel').onclick = closeModal;
+  document.getElementById('mi_add').onclick = ()=>{
+    const label = document.getElementById('mi_label').value || 'new';
+    const emoji = document.getElementById('mi_emoji').value || label[0];
+    const color = document.getElementById('mi_color').value || randomColor();
+    state.icons.push({id:Date.now().toString(), label, emoji, color});
+    saveState(); render(); closeModal();
+  };
+}
+
+function openEditModal(icon){
+  const html = `<div class="card">
+    <h3>edit: ${escapeHtml(icon.label)}</h3>
+    <label>label <input id="me_label" type="text" value="${escapeHtml(icon.label)}" /></label>
+    <label>emoji <input id="me_emoji" type="text" value="${escapeHtml(icon.emoji||'')}" /></label>
+    <label>color <input id="me_color" type="text" value="${escapeHtml(icon.color||'')}" /></label>
+    <div class="row"><button id="me_save" class="small">save</button><button id="me_delete" class="small">delete</button><button id="me_cancel" class="small">cancel</button></div>
+  </div>`;
+  showModal(html);
+  document.getElementById('me_cancel').onclick = closeModal;
+  document.getElementById('me_delete').onclick = ()=>{
+    state.icons = state.icons.filter(i=>i.id!==icon.id);
+    saveState(); render(); closeModal();
+  };
+  document.getElementById('me_save').onclick = ()=>{
+    const label = document.getElementById('me_label').value || icon.label;
+    const emoji = document.getElementById('me_emoji').value || icon.emoji;
+    const color = document.getElementById('me_color').value || icon.color;
+    state.icons = state.icons.map(i=> i.id===icon.id ? {...i, label, emoji, color} : i);
+    saveState(); render(); closeModal();
+  };
+}
+
+function openImportModal(){
+  const html = `<div class="card">
+    <h3>import layout string</h3>
+    <label>paste string <textarea id="imp_str" rows="4" placeholder="paste here"></textarea></label>
+    <div class="row"><button id="imp_load" class="small">load</button><button id="imp_cancel" class="small">cancel</button></div>
+    <div class="hint">this will replace current icons & wallpaper</div>
+  </div>`;
+  showModal(html);
+  document.getElementById('imp_cancel').onclick = closeModal;
+  document.getElementById('imp_load').onclick = ()=>{
+    const s = document.getElementById('imp_str').value.trim();
+    const parsed = decodeShare(s);
+    if(!parsed){ alert('invalid string'); return; }
+    if(parsed.icons) state.icons = parsed.icons;
+    if(parsed.wallpaper) state.wallpaper = parsed.wallpaper;
+    saveState(); render(); closeModal();
+  };
+}
+
+/* ---------- helpers ---------- */
+function randomColor(){
+  const r = Math.floor(Math.random()*200)+40;
+  const g = Math.floor(Math.random()*200)+40;
+  const b = Math.floor(Math.random()*200)+40;
+  return `rgb(${r},${g},${b})`;
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, (m)=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
+
+/* ---------- time updater ---------- */
+function tickTime(){
+  const d = new Date();
+  const h = d.getHours(); const m = d.getMinutes().toString().padStart(2,'0');
+  document.getElementById('time').textContent = `${h}:${m}`;
+}
+setInterval(tickTime, 60*1000);
+tickTime();
+
+/* ---------- init ---------- */
+loadState();
+render();
+
+/* ---------- register service worker (for offline) ---------- */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('service-worker.js').catch(e=>console.warn('sw failed',e));
+}
+</script>
+</body>
+</html>
