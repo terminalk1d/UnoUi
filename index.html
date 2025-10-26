@@ -2,263 +2,334 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>my launcher — pwa</title>
-
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>launcher — fullscreen</title>
 <link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#0b1220">
+<meta name="theme-color" content="#071428">
 
 <style>
   :root{
-    --bg:#0b1220;
+    --bg-1:#041022;
+    --bg-2:#071428;
     --panel: rgba(255,255,255,0.06);
     --accent:#22c1ff;
-    --icon-size:72px;
-    --grid-gap:14px;
   }
-  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;color:#fff;background:#000;}
-  .phone {
-    width:390px;
-    height:844px;
-    margin:20px auto;
-    border-radius:34px;
-    overflow:hidden;
-    box-shadow:0 30px 60px rgba(0,0,0,0.6),0 6px 14px rgba(0,0,0,0.6);
-    background:var(--bg);
-    position:relative;
+  /* fullscreen base */
+  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;color:#fff;background:var(--bg-2);}
+  *{box-sizing:border-box}
+  .app {
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+    justify-content:flex-start;
+    padding:14px;
+    background:linear-gradient(180deg,var(--bg-1),var(--bg-2));
     -webkit-user-select:none;
     user-select:none;
   }
 
-  /* wallpaper layer */
-  .wallpaper {
-    position:absolute;inset:0;background-size:cover;background-position:center;filter:brightness(.95);
-  }
-
   /* status bar */
   .status {
-    height:44px;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(6px);
-    background:linear-gradient(180deg, rgba(255,255,255,0.03), transparent);
+    height:48px;display:flex;align-items:center;justify-content:space-between;padding:6px 10px;
+    color:#dfe9f2;font-weight:600;
   }
-  .status .left{display:flex;gap:8px;align-items:center}
-  .status .time{font-weight:600;font-size:15px}
+  .status .time{font-size:16px}
+  .status .right{font-size:13px;opacity:.95}
 
-  /* dock + app grid */
-  .content{position:relative;padding:14px 18px 88px;height:calc(100% - 44px);box-sizing:border-box}
-  .app-grid{
-    display:grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap:var(--grid-gap);
+  /* launcher area */
+  .launcher {
+    flex:1;
     margin-top:6px;
-    user-select:none;
-  }
-
-  .icon {
-    height:calc(var(--icon-size) + 24px);
+    position:relative;
     display:flex;
-    align-items:center;
     flex-direction:column;
-    gap:6px;
-    text-align:center;
-    cursor:pointer;
-    transition:transform .12s;
-  }
-  .icon .bubble{
-    width:var(--icon-size);
-    height:var(--icon-size);
-    border-radius:18px;
-    display:flex;align-items:center;justify-content:center;
-    font-size:28px;font-weight:700;color:#fff;
-    box-shadow: 0 6px 12px rgba(0,0,0,0.45);
-    opacity:.95;
-  }
-  .icon .label{font-size:12px;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
-  .icon.dragging{opacity:.6;transform:scale(.98)}
-
-  .dock {
-    position:absolute;left:50%;transform:translateX(-50%);
-    bottom:18px;padding:10px 18px;border-radius:20px;background:rgba(255,255,255,0.06);
-    display:flex;gap:18px;align-items:center;
-    box-shadow: 0 12px 30px rgba(0,0,0,0.6);
+    gap:12px;
   }
 
-  .controls {
-    position:absolute;right:12px;top:12px;display:flex;gap:8px;flex-direction:column;
+  /* wallpaper (edge to edge) */
+  .wallpaper {
+    position:absolute;inset:0;background-size:cover;background-position:center;filter:brightness(.95);
+    z-index:0;border-radius:18px;
   }
-  .controls button{
-    border:0;padding:8px 10px;background:rgba(255,255,255,0.06);color:#fff;border-radius:10px;font-weight:600;backdrop-filter:blur(6px);
+
+  .overlay {
+    position:relative;z-index:1;padding:16px;height:100%;display:flex;flex-direction:column;
   }
 
   .panel {
-    position:absolute;left:12px;top:60px;padding:12px;border-radius:12px;background:var(--panel);backdrop-filter:blur(8px);
+    background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+    padding:10px 12px;border-radius:12px;backdrop-filter: blur(8px);width:fit-content;
   }
 
-  .modal {
-    position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;
+  /* zoomed grid for 5x5 */
+  .grid {
+    margin-top:8px;
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:14px;
+    width:100%;
+    max-width:980px;
   }
-  .card{background:#0f1720;padding:16px;border-radius:12px;min-width:300px}
-  label{display:block;font-size:13px;margin-top:8px;color:#bcd}
+
+  .cell {
+    height:92px;
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  .icon {
+    width:84px;height:84px;border-radius:18px;background:rgba(255,255,255,0.03);
+    display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;cursor:pointer;
+    transition:transform .12s;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.45);
+    text-align:center;overflow:hidden;
+  }
+  .icon .bubble{width:64px;height:64px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:28px}
+  .label{font-size:12px;color:rgba(255,255,255,0.9);width:100%;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
+  .icon.dragging{opacity:.55;transform:scale(.98)}
+
+  /* dock */
+  .dock {
+    margin-top:auto;display:flex;gap:14px;align-items:center;justify-content:center;padding:14px;border-radius:16px;background:rgba(255,255,255,0.04);backdrop-filter:blur(10px);
+  }
+
+  /* controls */
+  .controls {display:flex;gap:8px;flex-direction:column;position:fixed;right:12px;top:68px;z-index:9}
+  .controls button{border:0;padding:8px 10px;background:rgba(255,255,255,0.06);color:#fff;border-radius:10px;font-weight:700;backdrop-filter:blur(6px);cursor:pointer}
+
+  /* modal */
+  .modal-root{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);z-index:40}
+  .card{background:#0f1720;border-radius:12px;padding:14px;min-width:300px;color:#dfefff}
   input[type="text"], input[type="file"], textarea{width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:#07101a;color:#fff}
   .row{display:flex;gap:8px;margin-top:10px}
-  .small{font-size:12px;padding:6px 8px}
-  .hint{font-size:12px;color:#9aa;font-style:italic;margin-top:6px}
+  .small{font-size:13px;padding:8px 10px;border-radius:8px;cursor:pointer}
+  .hint{font-size:12px;color:#9aa;margin-top:6px}
 
-  @media (max-width:420px){
-    .phone{width:360px;height:780px}
+  @media (max-width:600px){
+    .grid{gap:10px}
+    .cell{height:76px}
+    .icon{width:70px;height:70px}
+    .icon .bubble{width:52px;height:52px;font-size:22px}
   }
 </style>
 </head>
 <body>
-<div class="phone" id="phone">
-  <div class="wallpaper" id="wallpaper"></div>
-
+<div class="app" id="app">
   <div class="status">
-    <div class="left"><div class="time" id="time">12:00</div></div>
-    <div class="right"><div style="font-size:12px;opacity:.9">wifi • 100%</div></div>
+    <div class="time" id="time">12:00 pm</div>
+    <div class="right" id="statusRight">wifi • 100%</div>
   </div>
 
-  <div class="content">
-    <div class="panel">
-      <strong>launcher</strong>
-      <div class="hint">drag to reorder • changes auto-save</div>
+  <div class="launcher" id="launcher">
+    <div class="wallpaper" id="wallpaper"></div>
+
+    <div class="overlay">
+      <div class="panel"><strong>launcher</strong> <span class="hint" style="margin-left:8px;font-size:12px;opacity:.9">drag icons to reorder • tap to open • long press to edit</span></div>
+
+      <div class="grid" id="grid" aria-label="app grid"></div>
+
+      <div class="dock" id="dock">
+        <!-- dock will be populated -->
+      </div>
     </div>
+  </div>
 
-    <div class="app-grid" id="grid"></div>
-
-    <div class="dock" id="dock">
-      <div class="icon" data-id="dock1"><div class="bubble" style="border-radius:14px;background:linear-gradient(135deg,#fff3 0,#fff5 100%);color:#222">★</div><div class="label">fav</div></div>
-      <div class="icon" data-id="dock2"><div class="bubble" style="border-radius:14px;background:linear-gradient(135deg,#fff3 0,#fff5 100%);color:#222">☎</div><div class="label">call</div></div>
-    </div>
-
-    <div class="controls">
-      <button id="addBtn">add icon</button>
-      <button id="wallBtn">set wallpaper</button>
-      <button id="exportBtn">export layout</button>
-      <button id="importBtn">import layout</button>
-      <button id="clearBtn">reset</button>
-    </div>
-
+  <div class="controls">
+    <button id="addBtn">add icon</button>
+    <button id="wallBtn">set wallpaper</button>
+    <button id="exportBtn">export layout</button>
+    <button id="importBtn">import layout</button>
+    <button id="clearBtn">reset</button>
   </div>
 </div>
 
-<!-- hidden file input for wallpaper -->
 <input id="wallInput" type="file" accept="image/*" style="display:none" />
-
-<!-- modals -->
-<div id="modalRoot" style="display:none"></div>
+<div class="modal-root" id="modalRoot"></div>
 
 <script>
-/* ---------- simple utilities for base64-coded "share string" ---------- */
+/* ---------- helpers ---------- */
+function nowStamp(){ return Date.now().toString(); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, (m)=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
+
+/* ---------- encoding utilities ---------- */
 function encodeShare(obj){
   const json = JSON.stringify(obj);
-  // safely to btoa: encodeURIComponent -> binary string -> btoa
   const uri = encodeURIComponent(json);
   let binary = '';
-  for (let i=0;i<uri.length;i++){
-    binary += String.fromCharCode(uri.charCodeAt(i));
-  }
+  for (let i=0;i<uri.length;i++) binary += String.fromCharCode(uri.charCodeAt(i));
   return btoa(binary);
 }
 function decodeShare(str){
   try{
     let binary = atob(str);
     let uri = '';
-    for (let i=0;i<binary.length;i++){
-      uri += String.fromCharCode(binary.charCodeAt(i));
-    }
+    for (let i=0;i<binary.length;i++) uri += String.fromCharCode(binary.charCodeAt(i));
     const json = decodeURIComponent(uri);
     return JSON.parse(json);
-  }catch(e){
-    return null;
-  }
+  }catch(e){ return null; }
 }
 
-/* ---------- app data model ---------- */
+/* ---------- default icons (with originalIndex) ---------- */
 const DEFAULT_ICONS = [
-  {id:'1',label:'browser',emoji:'🌐',color:'#ff6b6b'},
-  {id:'2',label:'music',emoji:'🎧',color:'#f59e0b'},
-  {id:'3',label:'photos',emoji:'🖼️',color:'#60a5fa'},
-  {id:'4',label:'notes',emoji:'📝',color:'#a78bfa'},
-  {id:'5',label:'store',emoji:'🛒',color:'#34d399'},
-  {id:'6',label:'maps',emoji:'🗺️',color:'#fb7185'},
-  {id:'7',label:'game',emoji:'🎮',color:'#f97316'},
-  {id:'8',label:'settings',emoji:'⚙️',color:'#94a3b8'}
+  {orig:1,label:'browser',emoji:'🌐',color:'#ff6b6b',url:'https://www.google.com'},
+  {orig:2,label:'music',emoji:'🎧',color:'#f59e0b',url:'https://music.youtube.com'},
+  {orig:3,label:'photos',emoji:'🖼️',color:'#60a5fa',url:'https://photos.google.com'},
+  {orig:4,label:'notes',emoji:'📝',color:'#a78bfa',url:'https://docs.google.com'},
+  {orig:5,label:'store',emoji:'🛒',color:'#34d399',url:'https://amazon.com'},
+  {orig:6,label:'maps',emoji:'🗺️',color:'#fb7185',url:'https://maps.google.com'},
+  {orig:7,label:'game',emoji:'🎮',color:'#f97316',url:'https://roblox.com'},
+  {orig:8,label:'settings',emoji:'⚙️',color:'#94a3b8',url:''},
+  {orig:9,label:'youtube',emoji:'▶️',color:'#ff4444',url:'https://youtube.com'},
+  {orig:10,label:'twitter',emoji:'🐦',color:'#2ca0ff',url:'https://twitter.com'}
 ];
 
-const STORAGE_KEY = 'launcher.data.v1';
+const STORAGE_KEY = 'launcher.v2.data';
 
+/* ---------- state model ---------- */
+/* state.icons: array of objects:
+   { id (unique), orig (original index number), label, emoji, color, url, pos (1..25) }
+   pos determines cell in 5x5 grid
+*/
 let state = {
-  icons: [...DEFAULT_ICONS],
-  wallpaper: '', // data url
+  icons: [], // will be filled on init
+  wallpaper: '',
   timestamp: Date.now()
 };
 
-/* ---------- load & save ---------- */
+/* ---------- persistence ---------- */
 function loadState(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
       const parsed = JSON.parse(raw);
       Object.assign(state, parsed);
+      // ensure all icons have necessary fields
+      state.icons = (state.icons || []).map(i => ({ id:i.id||nowStamp(), orig:i.orig||0, label:i.label||'app', emoji:i.emoji||'✱', color:i.color||randomColor(), url:i.url||'', pos:i.pos||1 }));
+    }else{
+      // default populate first 10 icons into first slots
+      state.icons = DEFAULT_ICONS.slice(0,10).map((d,i)=>({ id: nowStamp()+i, orig:d.orig, label:d.label, emoji:d.emoji, color:d.color, url:d.url, pos: i+1 }));
     }
-  }catch(e){ console.warn(e) }
+  }catch(e){
+    console.warn('load error',e);
+  }
 }
 function saveState(){
   state.timestamp = Date.now();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-/* ---------- render ---------- */
+/* ---------- rendering ---------- */
 const gridEl = document.getElementById('grid');
 const wallpaperEl = document.getElementById('wallpaper');
+const dockEl = document.getElementById('dock');
+
 function render(){
   // wallpaper
   if(state.wallpaper) wallpaperEl.style.backgroundImage = `url(${state.wallpaper})`;
-  else wallpaperEl.style.background = 'linear-gradient(180deg,#081428 0%,#041220 100%)';
+  else wallpaperEl.style.background = 'linear-gradient(180deg,#041428 0%,#071428 100%)';
 
-  // grid
+  // grid 5x5
   gridEl.innerHTML = '';
-  state.icons.forEach((ic, idx) => {
-    const el = document.createElement('div');
-    el.className = 'icon';
-    el.dataset.id = ic.id;
-    el.innerHTML = `<div class="bubble" style="background:${ic.color}">${ic.emoji||ic.label[0]||'✱'}</div><div class="label">${ic.label}</div>`;
-    // context menu / edit
-    el.addEventListener('contextmenu', (ev)=>{ev.preventDefault(); openEditModal(ic);});
-    // click opens edit too
-    el.addEventListener('dblclick', ()=>openEditModal(ic));
-    // drag
-    el.draggable = true;
-    el.addEventListener('dragstart', (e)=>{
-      e.dataTransfer.setData('text/plain', ic.id);
-      el.classList.add('dragging');
+  for(let cell=1; cell<=25; cell++){
+    const cellEl = document.createElement('div');
+    cellEl.className = 'cell';
+    // find icon with this pos
+    const icon = state.icons.find(i=>i.pos===cell);
+    if(icon){
+      const el = makeIconElement(icon);
+      cellEl.appendChild(el);
+    }else{
+      // empty placeholder to allow drop
+      cellEl.addEventListener('dragover', e=>e.preventDefault());
+      cellEl.addEventListener('drop', (e)=>{
+        e.preventDefault();
+        const id = e.dataTransfer.getData('text/plain');
+        placeIconInCell(id, cell);
+      });
+    }
+    gridEl.appendChild(cellEl);
+  }
+
+  // dock: show first 4 icons with pos>100? But to keep simple, show the last two fixed or allow 2 dock slots
+  dockEl.innerHTML = '';
+  const dockIcons = state.icons.filter(i=>i.pos>=100 && i.pos<200).slice(0,4);
+  if(dockIcons.length===0){
+    // default: show favourites from positions 1 and 2 if no explicit dock icons
+    const d1 = state.icons.find(i=>i.pos===1);
+    const d2 = state.icons.find(i=>i.pos===2);
+    [d1,d2].forEach(d=>{
+      if(d) dockEl.appendChild(makeIconElement(d,true));
     });
-    el.addEventListener('dragend', ()=>el.classList.remove('dragging'));
-    el.addEventListener('dragover', (e)=>e.preventDefault());
-    el.addEventListener('drop', (e)=>{
-      e.preventDefault();
-      const draggedId = e.dataTransfer.getData('text/plain');
-      reorderIcons(draggedId, ic.id);
-    });
-    gridEl.appendChild(el);
+  }else{
+    dockIcons.forEach(d=>dockEl.appendChild(makeIconElement(d,true)));
+  }
+}
+
+function makeIconElement(icon, isDock=false){
+  const el = document.createElement('div');
+  el.className = 'icon';
+  el.dataset.id = icon.id;
+  el.draggable = true;
+
+  el.innerHTML = `<div class="bubble" style="background:${icon.color}">${icon.emoji||icon.label[0]||'✱'}</div><div class="label">${escapeHtml(icon.label)}</div>`;
+
+  el.addEventListener('click', (ev)=>{
+    // single click opens url if exists
+    if(icon.url){
+      // open in new tab
+      window.open(icon.url, '_blank');
+    }else{
+      // small feedback if no url
+      alert('no url set for this icon — long press to edit and add one.');
+    }
   });
+
+  // long press or dblclick to edit
+  let pressTimer = null;
+  el.addEventListener('mousedown', (e)=>{ pressTimer = setTimeout(()=>openEditModal(icon), 600); });
+  el.addEventListener('touchstart', (e)=>{ pressTimer = setTimeout(()=>openEditModal(icon), 600); });
+  el.addEventListener('mouseup', (e)=>{ clearTimeout(pressTimer); });
+  el.addEventListener('mouseleave', (e)=>{ clearTimeout(pressTimer); });
+  el.addEventListener('touchend', (e)=>{ clearTimeout(pressTimer); });
+
+  // drag start
+  el.addEventListener('dragstart', (e)=>{
+    e.dataTransfer.setData('text/plain', icon.id);
+    el.classList.add('dragging');
+  });
+  el.addEventListener('dragend', ()=>el.classList.remove('dragging'));
+
+  return el;
 }
 
-/* ---------- reorder helper ---------- */
-function reorderIcons(draggedId, targetId){
-  const ids = state.icons.map(i=>i.id);
-  const from = ids.indexOf(draggedId);
-  const to = ids.indexOf(targetId);
-  if(from<0||to<0||from===to) return;
-  const arr = [...state.icons];
-  const [item] = arr.splice(from,1);
-  arr.splice(to,0,item);
-  state.icons = arr;
-  saveState();
-  render();
+function placeIconInCell(id, cell){
+  const idx = state.icons.findIndex(i=>i.id===id);
+  if(idx<0) return;
+  // if target occupied, swap positions
+  const target = state.icons.find(i=>i.pos===cell);
+  const dragged = state.icons[idx];
+  if(target && target.id !== dragged.id){
+    const tmp = target.pos;
+    target.pos = dragged.pos;
+    dragged.pos = tmp;
+  }else{
+    dragged.pos = cell;
+  }
+  saveState(); render();
 }
 
-/* ---------- UI actions ---------- */
+/* ---------- reorder helper (drop onto icon) ---------- */
+function reorderByDrop(draggedId, targetId){
+  const dragged = state.icons.find(i=>i.id===draggedId);
+  const target = state.icons.find(i=>i.id===targetId);
+  if(!dragged || !target) return;
+  const tmp = target.pos;
+  target.pos = dragged.pos;
+  dragged.pos = tmp;
+  saveState(); render();
+}
+
+/* ---------- ui actions ---------- */
 document.getElementById('addBtn').addEventListener('click', ()=>openCreateModal());
 document.getElementById('wallBtn').addEventListener('click', ()=>document.getElementById('wallInput').click());
 document.getElementById('wallInput').addEventListener('change', async (ev)=>{
@@ -267,56 +338,161 @@ document.getElementById('wallInput').addEventListener('change', async (ev)=>{
   const reader = new FileReader();
   reader.onload = function(){
     state.wallpaper = reader.result;
-    saveState();
-    render();
+    saveState(); render();
   };
   reader.readAsDataURL(f);
 });
 document.getElementById('exportBtn').addEventListener('click', ()=>{
-  const share = encodeShare({icons:state.icons, wallpaper: state.wallpaper});
-  prompt('copy this layout string (share it or save it somewhere):', share);
+  const full = encodeShare({icons:state.icons, wallpaper:state.wallpaper});
+  const compact = generateCompactString();
+  // show both
+  showModal(`<div class="card">
+    <h3>export layout</h3>
+    <label>compact positions (quick): <input id="out_compact" type="text" readonly value="${compact}" /></label>
+    <label>full import string (copy this to fully restore): <textarea id="out_full" rows="4">${full}</textarea></label>
+    <div class="row"><button id="out_close" class="small">close</button></div>
+    <div class="hint">compact is quick & small but only maps original icon indices to positions; use full string to restore everything including labels, urls, and wallpaper.</div>
+  </div>`);
+  document.getElementById('out_close').onclick = closeModal;
 });
 document.getElementById('importBtn').addEventListener('click', ()=>openImportModal());
 document.getElementById('clearBtn').addEventListener('click', ()=>{
-  if(confirm('reset launcher to defaults?')){ state = {icons:[...DEFAULT_ICONS], wallpaper:'', timestamp:Date.now()}; saveState(); render(); }
+  if(confirm('reset launcher to defaults?')){
+    state.icons = DEFAULT_ICONS.slice(0,10).map((d,i)=>({ id: nowStamp()+i, orig:d.orig, label:d.label, emoji:d.emoji, color:d.color, url:d.url, pos: i+1 }));
+    state.wallpaper = '';
+    saveState(); render();
+  }
 });
 
-/* ---------- modals ---------- */
+/* ---------- compact string format ----------
+   entries separated by '-' where each entry is:
+     <origIndex><pos2digits>
+   example: 103 means orig=1 -> pos=03
+   we also support full base64 JSON string
+*/
+function generateCompactString(){
+  // for each icon that has orig number, produce orig + pos (2 digits)
+  // sort by orig for compact clarity
+  const entries = state.icons.filter(i=>i.orig && i.orig>0).map(i=>`${i.orig}${String(i.pos).padStart(2,'0')}`);
+  return entries.join('-');
+}
+function parseCompactString(s){
+  const parts = s.split(/[-,]/).map(p=>p.trim()).filter(Boolean);
+  const mapping = [];
+  for(const p of parts){
+    // pattern: digits, last two are pos
+    if(p.length < 3) continue;
+    const pos = parseInt(p.slice(-2),10);
+    const orig = parseInt(p.slice(0, p.length-2),10);
+    if(Number.isFinite(orig) && Number.isFinite(pos)) mapping.push({orig,pos});
+  }
+  return mapping;
+}
+
+/* ---------- import modal accepts either full share string (base64) or compact string ---------- */
+function openImportModal(){
+  const html = `<div class="card">
+    <h3>import layout</h3>
+    <label>paste compact or full string <textarea id="imp_str" rows="4" placeholder="paste compact like 103-205 or full share string"></textarea></label>
+    <div class="row"><button id="imp_load" class="small">load</button><button id="imp_cancel" class="small">cancel</button></div>
+    <div class="hint">full string restores icons, urls, wallpaper. compact maps default/orig icons to positions.</div>
+  </div>`;
+  showModal(html);
+  document.getElementById('imp_cancel').onclick = closeModal;
+  document.getElementById('imp_load').onclick = ()=>{
+    const s = document.getElementById('imp_str').value.trim();
+    if(!s) return;
+    // try full decode first
+    const decoded = decodeShare(s);
+    if(decoded && decoded.icons){
+      // full restore
+      state.icons = decoded.icons.map(i=>({ id:i.id||nowStamp(), orig:i.orig||0, label:i.label||'app', emoji:i.emoji||'✱', color:i.color||randomColor(), url:i.url||'', pos:i.pos||1 }));
+      if(decoded.wallpaper) state.wallpaper = decoded.wallpaper;
+      saveState(); render(); closeModal();
+      return;
+    }
+    // else try compact
+    const mapping = parseCompactString(s);
+    if(mapping.length>0){
+      // for each mapping, find default icon with same orig or use a placeholder
+      const used = [];
+      const newIcons = [];
+      mapping.forEach(m=>{
+        // find in state.icons or DEFAULT_ICONS
+        let icon = state.icons.find(i=>i.orig===m.orig);
+        if(!icon){
+          const def = DEFAULT_ICONS.find(d=>d.orig===m.orig);
+          if(def) icon = { id: nowStamp()+m.orig, orig:def.orig, label:def.label, emoji:def.emoji, color:def.color, url:def.url, pos:m.pos };
+        }else{
+          icon.pos = m.pos;
+        }
+        if(icon){
+          used.push(icon);
+        }
+      });
+      // keep any icons not overridden but ensure positions unique: remove duplicates by shifting free slots
+      // take used icons and fill rest with existing icons in remaining slots
+      const occupied = new Set(used.map(u=>u.pos));
+      const remainingIcons = state.icons.filter(i=>!used.some(u=>u.id===i.id));
+      let nextFree = 1;
+      remainingIcons.forEach(i=>{
+        while(occupied.has(nextFree) && nextFree<=25) nextFree++;
+        if(nextFree<=25){ i.pos = nextFree; occupied.add(nextFree); nextFree++; used.push(i); }
+      });
+      state.icons = used;
+      saveState(); render(); closeModal();
+      return;
+    }
+    alert('invalid string — paste a full share string or a compact string like 103-205');
+  };
+}
+
+/* ---------- modal helpers ---------- */
 const modalRoot = document.getElementById('modalRoot');
 function showModal(html){
-  modalRoot.innerHTML = `<div class="modal">${html}</div>`;
-  modalRoot.style.display = 'block';
+  modalRoot.innerHTML = `<div class="modal"><div class="card">${html}</div></div>`;
+  modalRoot.style.display = 'flex';
 }
-function closeModal(){ modalRoot.style.display = 'none'; modalRoot.innerHTML=''; }
+function closeModal(){ modalRoot.style.display = 'none'; modalRoot.innerHTML = ''; }
 
+/* ---------- create & edit icons ---------- */
 function openCreateModal(){
-  const html = `<div class="card">
+  showModal(`<div>
     <h3>add icon</h3>
     <label>label <input id="mi_label" type="text" placeholder="app name" /></label>
     <label>emoji or char <input id="mi_emoji" type="text" placeholder="emoji or letter" /></label>
     <label>color (css) <input id="mi_color" type="text" placeholder="#ff6b6b" /></label>
+    <label>url (https) <input id="mi_url" type="text" placeholder="https://example.com" /></label>
     <div class="row"><button id="mi_add" class="small">add</button><button id="mi_cancel" class="small">cancel</button></div>
-  </div>`;
-  showModal(html);
+  </div>`);
   document.getElementById('mi_cancel').onclick = closeModal;
   document.getElementById('mi_add').onclick = ()=>{
     const label = document.getElementById('mi_label').value || 'new';
     const emoji = document.getElementById('mi_emoji').value || label[0];
     const color = document.getElementById('mi_color').value || randomColor();
-    state.icons.push({id:Date.now().toString(), label, emoji, color});
+    const url = document.getElementById('mi_url').value || '';
+    // place in first free slot 1..25
+    const occupied = new Set(state.icons.map(i=>i.pos));
+    let pos = 1;
+    while(occupied.has(pos) && pos<=25) pos++;
+    if(pos>25){ alert('no free slots'); return; }
+    const orig = (Math.max(0, ...state.icons.map(i=>i.orig||0))||10) + 1; // give a new orig
+    const icon = { id: nowStamp(), orig, label, emoji, color, url, pos };
+    state.icons.push(icon);
     saveState(); render(); closeModal();
   };
 }
 
 function openEditModal(icon){
-  const html = `<div class="card">
-    <h3>edit: ${escapeHtml(icon.label)}</h3>
+  showModal(`<div>
+    <h3>edit</h3>
     <label>label <input id="me_label" type="text" value="${escapeHtml(icon.label)}" /></label>
     <label>emoji <input id="me_emoji" type="text" value="${escapeHtml(icon.emoji||'')}" /></label>
     <label>color <input id="me_color" type="text" value="${escapeHtml(icon.color||'')}" /></label>
+    <label>url <input id="me_url" type="text" value="${escapeHtml(icon.url||'')}" /></label>
+    <label>position (1-25) <input id="me_pos" type="text" value="${icon.pos}" /></label>
     <div class="row"><button id="me_save" class="small">save</button><button id="me_delete" class="small">delete</button><button id="me_cancel" class="small">cancel</button></div>
-  </div>`;
-  showModal(html);
+  </div>`);
   document.getElementById('me_cancel').onclick = closeModal;
   document.getElementById('me_delete').onclick = ()=>{
     state.icons = state.icons.filter(i=>i.id!==icon.id);
@@ -326,44 +502,34 @@ function openEditModal(icon){
     const label = document.getElementById('me_label').value || icon.label;
     const emoji = document.getElementById('me_emoji').value || icon.emoji;
     const color = document.getElementById('me_color').value || icon.color;
-    state.icons = state.icons.map(i=> i.id===icon.id ? {...i, label, emoji, color} : i);
+    const url = document.getElementById('me_url').value || '';
+    let pos = parseInt(document.getElementById('me_pos').value,10) || icon.pos;
+    if(pos<1) pos=1; if(pos>25) pos=25;
+    // if another icon occupies pos, swap
+    const other = state.icons.find(i=>i.pos===pos && i.id!==icon.id);
+    if(other) other.pos = icon.pos;
+    state.icons = state.icons.map(i=> i.id===icon.id ? {...i, label, emoji, color, url, pos} : i);
     saveState(); render(); closeModal();
   };
 }
 
-function openImportModal(){
-  const html = `<div class="card">
-    <h3>import layout string</h3>
-    <label>paste string <textarea id="imp_str" rows="4" placeholder="paste here"></textarea></label>
-    <div class="row"><button id="imp_load" class="small">load</button><button id="imp_cancel" class="small">cancel</button></div>
-    <div class="hint">this will replace current icons & wallpaper</div>
-  </div>`;
-  showModal(html);
-  document.getElementById('imp_cancel').onclick = closeModal;
-  document.getElementById('imp_load').onclick = ()=>{
-    const s = document.getElementById('imp_str').value.trim();
-    const parsed = decodeShare(s);
-    if(!parsed){ alert('invalid string'); return; }
-    if(parsed.icons) state.icons = parsed.icons;
-    if(parsed.wallpaper) state.wallpaper = parsed.wallpaper;
-    saveState(); render(); closeModal();
-  };
-}
-
-/* ---------- helpers ---------- */
+/* ---------- random color ---------- */
 function randomColor(){
   const r = Math.floor(Math.random()*200)+40;
   const g = Math.floor(Math.random()*200)+40;
   const b = Math.floor(Math.random()*200)+40;
   return `rgb(${r},${g},${b})`;
 }
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g, (m)=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m]); }
 
-/* ---------- time updater ---------- */
+/* ---------- time 12-hour am/pm ---------- */
 function tickTime(){
   const d = new Date();
-  const h = d.getHours(); const m = d.getMinutes().toString().padStart(2,'0');
-  document.getElementById('time').textContent = `${h}:${m}`;
+  let h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2,'0');
+  const ampm = h>=12 ? 'pm' : 'am';
+  h = h % 12;
+  if(h===0) h = 12;
+  document.getElementById('time').textContent = `${h}:${m} ${ampm}`;
 }
 setInterval(tickTime, 60*1000);
 tickTime();
@@ -372,9 +538,31 @@ tickTime();
 loadState();
 render();
 
-/* ---------- register service worker (for offline) ---------- */
+/* ---------- global drag handler for dropping onto icons (to swap) ---------- */
+document.addEventListener('dragover', e=>e.preventDefault());
+document.addEventListener('drop', e=>e.preventDefault());
+gridEl.addEventListener('drop', ()=>{}); // just to be safe
+
+// allow dropping onto another icon to swap positions
+gridEl.addEventListener('dragstart', ()=>{});
+gridEl.addEventListener('dragover', e=>e.preventDefault());
+gridEl.addEventListener('drop', (e)=>{
+  // this generic handler won't trigger swap; swapping is handled by dropping on the cell or using reorderByDrop when we detect target icon
+});
+
+// when dropping onto an icon element, reorder swap
+document.body.addEventListener('drop', (e)=>{
+  const draggedId = e.dataTransfer && e.dataTransfer.getData && e.dataTransfer.getData('text/plain');
+  if(!draggedId) return;
+  const target = e.target.closest('.icon');
+  if(target && target.dataset.id && target.dataset.id !== draggedId){
+    reorderByDrop(draggedId, target.dataset.id);
+  }
+});
+
+/* ---------- service worker registration (same sw file required) ---------- */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('service-worker.js').catch(e=>console.warn('sw failed',e));
+  navigator.serviceWorker.register('service-worker.js').catch(e=>console.warn('sw fail',e));
 }
 </script>
 </body>
